@@ -30,6 +30,6 @@ Simulation of industries with collusive and non-collusive periods over time, det
 }
 \examples{
 sim_list <- sim_col_r();
-sim_list <- sim_col_r(model = "2", periods = 1000, n_ind = 100);
-sim_list <- sim_col(model = "3", periods = 1000, n_ind = 300);
+sim_list <- sim_col_r(model = "2", periods = 1000, n_ind = 20);
+sim_list <- sim_col_r(model = "3", periods = 1000, n_ind = 30, n_firms_max=50);
 }

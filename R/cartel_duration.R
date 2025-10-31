@@ -102,17 +102,19 @@ get_enforcement_duration <- function(cartels, parms, model) {
 
 #' Cartel Duration
 #'
-#' Function to combine paneldata cartels, detected cartels, leniency cases returned by function sim_col into a cross-sectional dataset with duration
-#' @param cartel_dates binary collusive state
-#' @param detect_dates binary collusive state that eventually got detected
-#' @param leniency_dates binary collusive state that eventually got found due to leniency application
+#' Function to combine paneldata cartels and detected cartels returned by function sim_col_r into a cross-sectional dataset with duration
+#' @param cartels_detected binary collusive state that eventually got detected
+#' @param cartels_undetected binary collusive state that never got detected
+#' @param r_all numeric stochastic interest rates
+#' @param delta_all numeric discount factor based on interest rates
+#' @param model int 1, 2, 3
 #'
 #' @return cross-sectional dataset with duration
 #' @examples
-#' sim_list <- sim_col();
-#' df <- get_cartel_duration(sim_list$cartels, sim_list$detection, sim_list$leniency);
+#' sim_list <- sim_col_r();
+#' df <- get_cartel_duration(sim_list$cartels_detected, sim_list$cartels_undetected, sim_list$interest_r, sim_list$deltas, sim_list$parms, model=1)
 #' @export
-get_cartel_duration <- function(cartels_detected, cartels_undetected, r_all, delta_all, parms, model){
+get_durations <- function(cartels_detected, cartels_undetected, r_all, delta_all, parms, model){
   cartels_detected_duration <- get_enforcement_duration(cartels_detected, parms, model)
   df <- cartels_detected_duration %>%
     dplyr::mutate(detected = 1,
@@ -149,51 +151,35 @@ get_cartel_duration <- function(cartels_detected, cartels_undetected, r_all, del
   data1 <- calculate_var_r(data1, r_all)
   data1$var_r <- ifelse(is.na(data1$var_r), 0, data1$var_r)
   data1 <- calculate_mean_delta(data1, delta_all)
-  cartels_duration <- df
+  cartels_duration <- data1 %>%
+    select(-sigma_start) %>%
+    rename(sigma = sigma_all_t)
 }
 
 
 
 # Functions to extend dataset for estimations --------------------------------------------------------------
 
-# Add industries without cartels, used for Heckman Sample Selection Correction
-add_non_collusive_industries <- function(parms, n_industries, cartels_duration) {
-  parms$parm_id <- 1:nrow(parms)
-  data_grid <- expand.grid(industry = 1:n_industries, parm_id = parms$parm_id)
-  data_grid <- data_grid[order(data_grid$industry, data_grid$parm_id),]
-
-  # Join unique parms with basic grid
-  data_parms <- full_join(parms, data_grid, by="parm_id")
-
-  # Join parms_grid with all cartels
-  data_all <- full_join(cartels_duration, data_parms)  #by all parms
-
-  # Add unique industry ID
-  df <- data_all %>%
-    replace(is.na(data_all), 0) %>%
-    relocate(industry, parm_id, cartel) %>%
-    group_by(parm_id, industry) %>%
-    dplyr::mutate(industry_id = cur_group_id()) %>%
-    arrange(parm_id, industry, start)
-  data_all <- df
-  data_all$sigma_all_t  <- get_sigma_all_t(data_all$sigma_start)
-  data_all
-}
-
-# Add nonlinear variables, used for Lasso CV - Model 1 and 2
+# Add nonlinear variables, used for Lasso CV and Random Forest
+#' Nonlinear Variables
+#'
+#' Function to add nonlinear interdependenciens
+#' @param data cross-sectional cartel dataset
+#' @param model int 1, 2, 3
+#'
+#' @return cross-sectional cartel dataset with nonlinear interdependencies
+#' @examples
+#' sim_list <- sim_col_r();
+#' df <- get_cartel_duration(sim_list$cartels_detected, sim_list$cartels_undetected, sim_list$interest_r, sim_list$deltas, sim_list$parms, model=1)
+#' df <- add_nonlinears(df, model=1)
+#' @export
 add_nonlinears <- function(data, model) {
   if (model==3) {
     data <- data %>%
-      mutate(gamma2 = gamma^2,
-             gamma3 = gamma^3,
-             nfirms_theta = n_firms * theta)
+      mutate(nfirms_theta = n_firms * theta)
   }
   data <- data %>%
-    mutate(nfirms2 = n_firms^2,
-           nfirms3 = n_firms^3,
-           sigma2 = sigma_all_t^2,
-           sigma3 = sigma_all_t^3,
-           nfirms_sigma = n_firms * sigma_all_t) %>%
+    mutate(nfirms_sigma = n_firms * sigma) %>%
     arrange(industry, parm_id, start)
 }
 
