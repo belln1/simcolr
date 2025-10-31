@@ -100,8 +100,19 @@ get_enforcement_duration <- function(cartels, parms, model) {
   cartels_duration <- do.call(rbind, cd)
 }
 
-#model = 1
-combine_durations <- function(cartels_detected, cartels_undetected, parms, model){
+#' Cartel Duration
+#'
+#' Function to combine paneldata cartels, detected cartels, leniency cases returned by function sim_col into a cross-sectional dataset with duration
+#' @param cartel_dates binary collusive state
+#' @param detect_dates binary collusive state that eventually got detected
+#' @param leniency_dates binary collusive state that eventually got found due to leniency application
+#'
+#' @return cross-sectional dataset with duration
+#' @examples
+#' sim_list <- sim_col();
+#' df <- get_cartel_duration(sim_list$cartels, sim_list$detection, sim_list$leniency);
+#' @export
+get_cartel_duration <- function(cartels_detected, cartels_undetected, r_all, delta_all, parms, model){
   cartels_detected_duration <- get_enforcement_duration(cartels_detected, parms, model)
   df <- cartels_detected_duration %>%
     dplyr::mutate(detected = 1,
@@ -134,6 +145,10 @@ combine_durations <- function(cartels_detected, cartels_undetected, parms, model
                   rep_off = ifelse(nTc > 1, 1, 0)) %>%
     arrange(industry, parm_id, start) %>%
     relocate(parm_id, industry, cartel, detected, nTc, rep_off, start)
+  data1 <- calculate_mean_r(df, r_all)
+  data1 <- calculate_var_r(data1, r_all)
+  data1$var_r <- ifelse(is.na(data1$var_r), 0, data1$var_r)
+  data1 <- calculate_mean_delta(data1, delta_all)
   cartels_duration <- df
 }
 
