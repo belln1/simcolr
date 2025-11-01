@@ -1,8 +1,3 @@
-#rm(list = ls())
-#source(file = "analysis/scripts/functions_simulation.R")
-# debugSource(file = "R/distributions.R")
-# debugSource(file = "R/cartel_duration.R")
-
 combine_parms_model12 <- function(n_firms_in, sigma_in){
   n_sim <- length(n_firms_in) * length(sigma_in)
   parms <- tibble(
@@ -38,18 +33,18 @@ rep_row<-function(x,n){
 
 get_delta <- function(r){1/(1+r)}
 
-random_steps <- function(n){
+random_steps <- function(n, alpha){
   x <- rbinom(n, 1, 0.5)
-  (2*x - 1)/500
+  (2*x - 1)/alpha
 }
 
 get_r <- function(r_min, r_max){
   r_start <- runif(1, r_min, r_max)
 }
 
-get_walk_r <- function(periods, r_min, r_max){
+get_walk_r <- function(periods, r_min, r_max, alpha){
   r <- get_r(r_min, r_max)
-  steps <- random_steps(periods-1)
+  steps <- random_steps(periods-1, alpha)
   cumsum(c(r, steps))
 }
 
@@ -91,6 +86,14 @@ get_detection_model2_ind <- function(periods, sigma, d_nfirms){
   x <- as.numeric(runif(periods) <= sigma*d_nfirms) # revised version, more intuitive formular
 }
 
+get_sample <- function(firms_in_cartel, detection){
+  firms_in_cartel * detection
+}
+
+get_undetected <- function(firms_in_cartel, detection){
+  firms_in_cartel * (1 - detection)
+}
+
 # Does an industry want to be in a cartel?
 # Reduce(function, vector) applies function on the first two elements of vector, then on the result of that and the third element
 # accumulate=TRUE returns all results, accumulate=FALSE returns only last result
@@ -102,13 +105,13 @@ get_in_cartel <- function(ind, ICC_entry, ICC_exit) {
   in_cartel <- if_else(w == -1, 0, 1) # change -1 to 0 (not in cartel)
 }
 
-simulate_industry_M1_M2 <- function(i, parms, model, r_min, r_max, periods) {
+simulate_industry_M1_M2 <- function(i, parms, model, r_min, r_max, periods, alpha) {
   sigma <- rep(parms$sigma_start,periods)
   n_times_caught <- rep(0,periods)
   ICC_entry <- get_ICC_model1(parms$n_firms)
   ICC_exit <- ICC_entry
 
-  walk_r <- get_walk_r(periods, r_min, r_max)
+  walk_r <- get_walk_r(periods, r_min, r_max, alpha)
   all_ind_delta <- get_deltas_walk_r(walk_r)
 
   # Who wants to be in cartel?
@@ -151,14 +154,14 @@ simulate_industry_M1_M2 <- function(i, parms, model, r_min, r_max, periods) {
 }
 
 # INDUSTRYLEVEL - MODEL III
-simulate_industry_M3 <- function(i, parms, r_min, r_max, periods) {
+simulate_industry_M3 <- function(i, parms, r_min, r_max, periods, alpha) {
   gamma = parms$gamma
   theta = parms$theta
   sigma <- rep(parms$sigma_start,periods)
   n_times_caught <- rep(0,periods)
   ICC_entry <- get_ICC_entry_model3(parms$n_firms, sigma, gamma, theta)
   ICC_exit <- get_ICC_exit_model3(parms$n_firms, sigma, gamma, theta)
-  walk_r <- get_walk_r(periods, r_min, r_max)
+  walk_r <- get_walk_r(periods, r_min, r_max, alpha)
   all_ind_delta <- get_deltas_walk_r(walk_r)
 
   # Who wants to be in cartel?
@@ -211,18 +214,22 @@ simulate_industry_M3 <- function(i, parms, r_min, r_max, periods) {
 #' Simulation of industries with collusive and non-collusive periods over time, detected and undetected, based on Stigler(1964) and inspired by Bos/Davies/Harrington/Ormosi(2018) and Harrington/Chang(2009)
 #' @param model Modelname (1, 2, 3)
 #' @param periods Number of time periods
-#' @param n_industries Number of industries
+#' @param r_min Minimum interest rate
+#' @param r_max Maximum interest rate
+#' @param n_firms_min Minimum number of firms in industry
+#' @param n_firms_max Maximum number of firms in industry
+#' @param alpha Sstep size of random walk of interest rate
 #'
-#' @return List with detected cartels, undetected cartels, all cartels, discount factor over time, interest rate over time
+#' @return List with detected cartels, undetected cartels, all cartels, discount factor over time, interest rate over time, parameters
 #' @import dplyr
 #' @examples
 #' sim_list <- sim_col_r();
 #' sim_list <- sim_col_r(model = "2", periods = 1000, n_ind = 20);
-#' sim_list <- sim_col_r(model = "3", periods = 1000, n_ind = 30, n_firms_max=50);
+#' sim_list <- sim_col_r(model = "3", periods = 1000, n_ind = 30, n_firms_max=10);
 #' @export
 sim_col_r <- function(model=1, periods=1000, n_industries=30,
-                      r_min=0.001, r_max=0.3, min_share=1, n_firms_min=2,
-                      n_firms_max=20){
+                      r_min=0.001, r_max=0.3, n_firms_min=2,
+                      n_firms_max=20, alpha=500){
   n_firms <- n_firms_min:n_firms_max
   parms <- combine_parms(model, n_firms)
 
@@ -242,9 +249,9 @@ sim_col_r <- function(model=1, periods=1000, n_industries=30,
 
     for (i in 1:n_industries) {
       if (model==3) {
-        sim_list <- simulate_industry_M3(i, parms[k,], r_min, r_max, periods)
+        sim_list <- simulate_industry_M3(i, parms[k,], r_min, r_max, periods, alpha)
       } else {
-        sim_list <- simulate_industry_M1_M2(i, parms[k,], model=model, r_min, r_max, periods)
+        sim_list <- simulate_industry_M1_M2(i, parms[k,], model=model, r_min, r_max, periods, alpha)
       }
       cartels_det <- get_sample(sim_list$cartels, sim_list$detection)
       cartels_undet <- get_undetected(sim_list$cartels, sim_list$detection)

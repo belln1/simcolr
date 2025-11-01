@@ -23,26 +23,14 @@ get_cartel_duration <- function(cartels) {
   end <- dplyr::rename(end, "end" = row)
   df <- cbind(start, end=end$end)
   df$duration <- df$end - df$start + 1
-  # Logarithm of duration: log(n+1)
   df$lduration <- log(df$duration+1)
   df <- df %>%
     dplyr::rename(industry = col) %>%
     group_by(industry) %>%
-    arrange(industry, start) %>%  # order rows
-    relocate(industry, start, end, duration)  # order columns
+    arrange(industry, start) %>%
+    relocate(industry, start, end, duration)
   return(df)
 }
-
-# get_r_mean <- function(r_all, industry, parm_id, start, end){
-#   r_array <- r_all[start:end, industry, parm_id]
-#   return(mean(r_array))
-# }
-# # get_r_mean(r_all)
-#
-# add_r_sumstats <- function(cartels_duration, r_all){
-#   cd <- cartels_duration %>%
-#     mutate(r_mean = get_r_mean(r_all, industry, parm_id, start, end))
-# }
 
 calculate_mean_delta <- function(cartel_duration, delta_all) {
   cartel_duration$mean_delta <- mapply(
@@ -83,7 +71,6 @@ calculate_var_r <- function(cartel_duration, r_all) {
   return(cartel_duration)
 }
 
-#cartels = cartels_detected
 get_enforcement_duration <- function(cartels, parms, model) {
   cd <- apply(cartels, MARGIN=3, FUN=get_cartel_duration)
   for (i in 1:nrow(parms)) {
@@ -181,16 +168,4 @@ add_nonlinears <- function(data, model) {
   data <- data %>%
     mutate(nfirms_sigma = n_firms * sigma) %>%
     arrange(industry, parm_id, start)
-}
-
-get_sumstats <- function(df){
-  df_stats <- describe(df, fast = FALSE)
-  df_stats <- select(df_stats, mean, median, sd, min, max, skew, n)
-  df_stats$mean <- round(df_stats$mean,2)
-  df_stats$median <- round(df_stats$median,2)
-  df_stats$sd <- round(df_stats$sd,2)
-  df_stats$min <- round(df_stats$min,2)
-  df_stats$max <- round(df_stats$max,2)
-  df_stats$skew <- round(df_stats$skew,2)
-  k <- kbl(df_stats, "latex", booktabs = T, linesep = "")
 }

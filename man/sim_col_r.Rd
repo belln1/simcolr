@@ -10,9 +10,9 @@ sim_col_r(
   n_industries = 30,
   r_min = 0.001,
   r_max = 0.3,
-  min_share = 1,
   n_firms_min = 2,
-  n_firms_max = 20
+  n_firms_max = 20,
+  alpha = 500
 )
 }
 \arguments{
@@ -20,10 +20,18 @@ sim_col_r(
 
 \item{periods}{Number of time periods}
 
-\item{n_industries}{Number of industries}
+\item{r_min}{Minimum interest rate}
+
+\item{r_max}{Maximum interest rate}
+
+\item{n_firms_min}{Minimum number of firms in industry}
+
+\item{n_firms_max}{Maximum number of firms in industry}
+
+\item{alpha}{Sstep size of random walk of interest rate}
 }
 \value{
-List with detected cartels, undetected cartels, all cartels, discount factor over time, interest rate over time
+List with detected cartels, undetected cartels, all cartels, discount factor over time, interest rate over time, parameters
 }
 \description{
 Simulation of industries with collusive and non-collusive periods over time, detected and undetected, based on Stigler(1964) and inspired by Bos/Davies/Harrington/Ormosi(2018) and Harrington/Chang(2009)
@@ -31,5 +39,5 @@ Simulation of industries with collusive and non-collusive periods over time, det
 \examples{
 sim_list <- sim_col_r();
 sim_list <- sim_col_r(model = "2", periods = 1000, n_ind = 20);
-sim_list <- sim_col_r(model = "3", periods = 1000, n_ind = 30, n_firms_max=50);
+sim_list <- sim_col_r(model = "3", periods = 1000, n_ind = 30, n_firms_max=10);
 }
