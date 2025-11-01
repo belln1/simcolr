@@ -12,6 +12,10 @@ sim_col_r(
   r_max = 0.3,
   n_firms_min = 2,
   n_firms_max = 20,
+  sigma = seq(0.1, 0.35, 0.05),
+  gamma = c(0.7, 0.8, 0.9),
+  theta = c(0, 0.5, 1),
+  struc = c(0, 1),
   alpha = 500
 )
 }
@@ -31,7 +35,7 @@ sim_col_r(
 \item{alpha}{Sstep size of random walk of interest rate}
 }
 \value{
-List with detected cartels, undetected cartels, all cartels, discount factor over time, interest rate over time, parameters
+List with detected cartels, undetected cartels, all cartels, discount factor over time, interest rate over time, parameters, ICC
 }
 \description{
 Simulation of industries with collusive and non-collusive periods over time, detected and undetected, based on Stigler(1964) and inspired by Bos/Davies/Harrington/Ormosi(2018) and Harrington/Chang(2009)

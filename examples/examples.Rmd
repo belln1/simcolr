@@ -1,0 +1,150 @@
+---
+title: 'Simulate Collusion: Application Examples for Cartel Simulation based on stochastic interest rates'
+geometry: margin=1cm
+output:
+  html_document:
+    df_print: paged
+  word_document: default
+---
+
+Set knitr Options
+```{r}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, tidy=TRUE, tidy.opts = list(width.cutoff=80))
+```
+
+Clear Environment
+```{r}
+rm(list = ls())
+```
+
+Load Packages
+```{r include=FALSE}
+library(dplyr)
+library(tidyr)
+library(psych)
+library(ggplot2)
+library(ggfortify) 
+library(forecast)
+library(eha) # function phreg()
+library(stargazer)
+library(simcolr)
+```
+
+Set Seed for Reproducibility
+```{r}
+set.seed(123)
+```
+
+### Read in Data
+```{r}
+# Baseline Model 1 with default parameters.
+sim_list <- sim_col_r()
+
+# Model I in Bellert, Günster (2025)
+# sim_list <- sim_col_r(model = 1, periods = 1000, n_industries = 300, r_min = 0.001, r_max = 0.3, n_firms_min = 2, n_firms_max = 100, alpha = 500) 
+cartels_duration <- get_durations(sim_list$cartels_detected, sim_list$cartels_undetected, sim_list$interest_r, sim_list$deltas, sim_list$parms, model=1)
+cartels_duration <- data.frame(cartels_duration)
+```
+
+### Add Nonlinear Interdependencies between Variables
+```{r}
+cartels_duration <- add_nonlinears(cartels_duration, model=1)
+```
+
+###  Plot for ICC and Discount Factor of 5 Example Industries
+```{r}
+set.seed(123)
+n_firms <- 4
+gamma <- 0.8
+theta <- 1
+sigma_all <- 0.25
+sigma_t <- 1 - (1-sigma_all)^(1/200)
+struc <- 1
+
+r_min <- 0.001
+r_max <- 0.3
+
+sim_list_M1 <- sim_col_r(model = 1,n_firms_min = 4, n_firms_max = 4, n_industries = 5, sigma = 0.25, gamma = 0.8, theta = 1, struc = 1)
+sim_list_M3_1 <- sim_col_r(model = 3,n_firms_min = 4, n_firms_max = 4, n_industries = 5, sigma = 0.25, gamma = 0.8, theta = 1, struc = 1)
+sim_list_M3_0 <- sim_col_r(model = 3,n_firms_min = 4, n_firms_max = 4, n_industries = 5, sigma = 0.25, gamma = 0.8, theta = 0, struc = 1)
+x <- sim_list_M3_1$ICC
+x <- data.frame(x)
+df <- cbind(sim_list_M1$ICC[,1,1], sim_list_M3_1$ICC[, 1, 1], sim_list_M3_0$ICC[, 1, 1], sim_list_M3_1$deltas[,,1])
+df <- data.frame(df)
+sim <- ts(df)
+colnames(sim) <- c("ICC MI, II", "ICC MIII (no leniency)", "ICC MIII (full leniency)", paste("Industry", 1:ncol(sim_list_M3_0$deltas[,,1])))
+pallete <- c('blue4', 'blue', 'red', 'lightcoral', 'aquamarine3', 'cyan4', 'brown', 'orange')
+y_axis <- c(0.725, 0.875) # for singular picture
+autoplot(sim) +
+ ylim(y_axis) +
+  xlab("Time") +
+  ylab("") +
+  scale_colour_manual(values=pallete) +
+  theme(legend.title = element_blank())
+
+```
+
+### Plot Cartel Time Series
+```{r}
+c_det <- rowSums(sim_list$cartels_detected)/(dim(sim_list$cartels_detected)[2] * dim(sim_list$cartels_detected)[3]) # number of detected cartels / number of industries
+c_pop <- rowSums(sim_list$cartels_population)/(dim(sim_list$cartels_population)[2] * dim(sim_list$cartels_population)[3]) # number of cartels / number of industries
+sim_cartels <- ts(data = cbind(c_pop, c_det))
+colnames(sim_cartels) <- c("Population", "Sample")
+pallete <- c('blue', 'red')
+
+autoplot(sim_cartels*100) +
+  xlab("Time") +
+  ylab("Percentage of cartels") +
+  ggtitle("Percentage of Cartels of all Industries over Time") +
+  scale_colour_manual(values=pallete) + 
+  theme(legend.title = element_blank())
+
+```
+
+### Summary Statistics
+```{r}
+describe(cartels_duration)
+```
+
+### Correlations
+```{r}
+df_cor <-  Filter(function(x) sd(x) != 0, cartels_duration)
+df_cor <- select(df_cor, -c(parm_id, industry, cartel, lduration, nfirms_sigma, mean_delta))
+cor(df_cor)
+```
+### Mean Comparison Tests for Sumstats
+```{r}
+t.test(duration ~ detected, data=cartels_duration, var.equal = FALSE)
+t.test(n_firms ~ detected, data=cartels_duration, var.equal = FALSE)
+t.test(sigma ~ detected, data=cartels_duration, var.equal = FALSE)
+```
+
+### Linear Regression
+```{r}
+reg <- lm(lduration ~ start + n_firms + sigma + mean_r + var_r, data = cartels_duration)
+summary(reg)
+```
+
+### Hazard Rate Estimation
+```{r}
+periods <- dim(sim_list$cartels_population)[1]
+data_pop <- cartels_duration
+data_sample <- data_pop[data_pop$detected==1,]
+data_undetect <- data_pop[data_pop$detected==0,]
+
+data_pop$dead <- ifelse(data_pop$end < periods, 1, 0)
+data_sample$dead <- ifelse(data_sample$end < periods, 1, 0)
+data_undetect$dead <- ifelse(data_undetect$end < periods, 1, 0)
+
+hazC <- phreg(Surv(duration, dead) ~ start + n_firms + sigma + mean_r + var_r, data = data_pop,dist='weibull')
+hazS <- phreg(Surv(duration, detected) ~ start + n_firms + sigma + mean_r + var_r, data = data_sample,dist='weibull')
+hazU <- phreg(Surv(duration, dead) ~ start + n_firms + sigma + mean_r + var_r, data = data_undetect,dist='weibull')
+
+stargazer(hazS, hazU, hazC, 
+          title="HR Regression for Cartel Duration on Model I",
+          type="text",
+          column.labels = c("HRSample", "HRUndetect", "HRCartels"),
+          df=FALSE, digits=3)
+```
+
+

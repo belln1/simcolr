@@ -17,7 +17,7 @@ combine_parms_model3 <- function(n_firms_in, sigma_in, gamma_in, theta_in, struc
   )
 }
 
-combine_parms <- function(model, n_firms) {
+combine_parms <- function(model, n_firms, sigma_t, gamma, theta, struc) {
   if (model==1) return(combine_parms_model12(n_firms, sigma_t))
   else if(model==2) {
     parms <- combine_parms_model12(n_firms, sigma_t)
@@ -57,6 +57,10 @@ get_deltas_walk_r <- function(walk_r){
 # p_t = Prob(found in time t) = 1 - ((1-sigma)^(1/duration)) # formula for sigma, solved for p_t
 get_sigma_all_t <- function(sigma_t){
   1 - (1-sigma_t)^200
+}
+
+get_sigma_t <- function(sigma_all_t) {
+  1 - (1-sigma_all_t)^(1/200) # 200 is an approximation of mean duration, in simulation run with sigma=0
 }
 
 # Model 1 and 2: ICC depending on number of firms (cite Stigler 1964)
@@ -220,8 +224,9 @@ simulate_industry_M3 <- function(i, parms, r_min, r_max, periods, alpha) {
 #' @param n_firms_max Maximum number of firms in industry
 #' @param alpha Sstep size of random walk of interest rate
 #'
-#' @return List with detected cartels, undetected cartels, all cartels, discount factor over time, interest rate over time, parameters
+#' @return List with detected cartels, undetected cartels, all cartels, discount factor over time, interest rate over time, parameters, ICC
 #' @import dplyr
+#' @import DescTools
 #' @examples
 #' sim_list <- sim_col_r();
 #' sim_list <- sim_col_r(model = "2", periods = 1000, n_ind = 20);
@@ -229,12 +234,15 @@ simulate_industry_M3 <- function(i, parms, r_min, r_max, periods, alpha) {
 #' @export
 sim_col_r <- function(model=1, periods=1000, n_industries=30,
                       r_min=0.001, r_max=0.3, n_firms_min=2,
-                      n_firms_max=20, alpha=500){
+                      n_firms_max=20, sigma=seq(0.1, 0.35, 0.05), gamma=c(0.7,0.8,0.9), theta=c(0,0.5,1),
+                      struc=c(0,1), alpha=500){
   n_firms <- n_firms_min:n_firms_max
-  parms <- combine_parms(model, n_firms)
+  sigma_t <- get_sigma_t(sigma)
+  parms <- combine_parms(model, n_firms, sigma_t, gamma, theta, struc)
 
   delta_all <- array(0,dim = c(periods, n_industries, nrow(parms)))
   r_all <- array(0,dim = c(periods, n_industries, nrow(parms)))
+  ICC_all <- array(0,dim = c(periods, n_industries, nrow(parms)))
   cartels_detected <- array(0,dim = c(periods, n_industries, nrow(parms)))
   cartels_undetected <- array(0,dim = c(periods, n_industries, nrow(parms)))
   cartels_population <- array(0,dim = c(periods, n_industries, nrow(parms)))
@@ -246,6 +254,7 @@ sim_col_r <- function(model=1, periods=1000, n_industries=30,
     allcartels_pop <- matrix(0, nrow =periods, ncol = n_industries)
     delta_inds <- matrix(0, nrow =periods, ncol = n_industries)
     r_inds <- matrix(0, nrow =periods, ncol = n_industries)
+    ICC_inds <- matrix(0, nrow =periods, ncol = n_industries)
 
     for (i in 1:n_industries) {
       if (model==3) {
@@ -262,12 +271,14 @@ sim_col_r <- function(model=1, periods=1000, n_industries=30,
       allcartels_pop[, i] <- cartels_pop
       delta_inds[, i] <- sim_list$deltas
       r_inds[, i] <- sim_list$walk_r
+      ICC_inds[, i] <- sim_list$ICC_entry
     }
     delta_all[,, k] <- delta_inds
     r_all[,, k] <- r_inds
+    ICC_all[,, k] <- ICC_inds
     cartels_detected[,, k] <- allcartels_det
     cartels_undetected[,, k] <- allcartels_undet
     cartels_population[,, k] <- allcartels_pop
   }
-  return(list(cartels_detected = cartels_detected, cartels_undetected = cartels_undetected, cartels_population = cartels_population, deltas = delta_all, interest_r = r_all, parms=parms))
+  return(list(cartels_detected = cartels_detected, cartels_undetected = cartels_undetected, cartels_population = cartels_population, deltas = delta_all, interest_r = r_all, parms=parms, ICC=ICC_all))
 }
