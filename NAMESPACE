@@ -2,6 +2,7 @@
 
 export(add_nonlinears)
 export(get_durations)
+export(get_paneldata)
 export(sim_col_r)
 import(DescTools)
 import(dplyr)

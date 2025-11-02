@@ -147,4 +147,9 @@ stargazer(hazS, hazU, hazC,
           df=FALSE, digits=3)
 ```
 
+### Future Research: Create Paneldata
+
+```{r}
+df_panel <- get_paneldata(sim_list$cartels_population, sim_list$cartels_detected, sim_list$parms, sim_list$interest_r, sim_list$sigmas)
+```
 

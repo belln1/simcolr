@@ -169,3 +169,79 @@ add_nonlinears <- function(data, model) {
     mutate(nfirms_sigma = n_firms * sigma) %>%
     arrange(industry, parm_id, start)
 }
+
+
+# Create Paneldata  --------------------------------------------------------------
+
+get_endtimes_vector <- function(in_cartel) {
+  d <- lead(in_cartel)
+  d[is.na(d)] <- 0
+  e <- as.numeric((in_cartel - d) == 1)
+}
+get_rep_off <- function(in_cartel) {
+  e <- get_endtimes_vector(in_cartel)
+  ec <- cumsum(e)
+  lec <- lag(ec)
+  lec[is.na(lec)] <- 0
+  rep <- ifelse(lec>0, 1, 0)
+}
+
+# Create Paneldata
+#'
+#' Function to construct a panel dataset from sample and population of collusive and not collusive states over time
+#' @param cartels_population collusive and not collusive states of industries (population)
+#' @param cartels_detected detected and undetected collusive and not collusive states of industries (sample)
+#' @param parms parameter combinations used for simulation
+#' @param interest_r stochastic values of interest rate over time
+#' @param sigmas probability of detection over time
+#'
+#' @return panel dataset with cartels
+#' @examples
+#' sim_list <- sim_col_r();
+#' df_panel <- get_paneldata(sim_list$cartels_population, sim_list$cartels_detected, sim_list$parms, sim_list$interest_r, sim_list$sigmas)
+#' @export
+get_paneldata <- function(cartels_population, cartels_detected, parms, r_all, sigma_all) {
+  parms$parm_id <- 1:nrow(parms)
+
+  # # Convert the 3D array into a long dataframe
+  df_sample <- reshape2::melt(cartels_detected)
+  colnames(df_sample) <- c("period", "industry_id", "parm_id", "detected")
+
+  df_pop <- reshape2::melt(cartels_population)
+  colnames(df_pop) <- c("period", "industry_id", "parm_id", "in_cartel")
+
+  df_sample$ind_ID <- paste(df_sample$parm_id, df_sample$industry_id, sep="_")
+  df_sample$in_cartel <- df_pop$in_cartel
+
+  # Read in changing variables (r)
+  r_df <- reshape2::melt(r_all)
+  colnames(r_df) <- c("period", "industry_id", "parm_id", "r")
+  # Create the ind_ID column to match your existing dataframe
+  r_df$ind_ID <- paste(r_df$parm_id, r_df$industry_id, sep="_")
+  # # Remove the now-unnecessary dimension columns
+  r_df <- r_df[, c("period", "ind_ID", "r")]
+  # Combine df with r_df
+  df <- df_sample %>%
+    left_join(r_df, by=c("ind_ID", "period"))
+
+  # Read in changing sigmas
+  sigmas_df <- reshape2::melt(sigma_all)
+  colnames(sigmas_df) <- c("period", "industry_id", "parm_id", "sigma_t")
+  sigmas_df$ind_ID <- paste(sigmas_df$parm_id, sigmas_df$industry_id, sep="_")
+  sigmas_df <- sigmas_df[, c("period", "ind_ID", "sigma_t")]
+  df1 <- df %>%
+    left_join(sigmas_df, by=c("ind_ID", "period")) %>%
+    mutate(sigma_all_t = get_sigma_all_t(sigma_t))
+
+  # Combine df with parms
+  df2 <- df1 %>%
+    left_join(parms, by=c("parm_id")) %>%
+    select(-c(sigma_start, parm_id, industry_id))
+
+  # Add Repeat Offender
+  df3 <- df2 %>%
+    group_by(ind_ID) %>%
+    mutate(rep_off = get_rep_off(detected)) %>%
+    ungroup() %>%
+    relocate(ind_ID, period, in_cartel, detected, rep_off, n_firms, sigma_all_t)
+}

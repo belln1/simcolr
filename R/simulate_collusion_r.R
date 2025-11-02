@@ -242,6 +242,7 @@ sim_col_r <- function(model=1, periods=1000, n_industries=30,
 
   delta_all <- array(0,dim = c(periods, n_industries, nrow(parms)))
   r_all <- array(0,dim = c(periods, n_industries, nrow(parms)))
+  sigma_all <- array(0,dim = c(periods, n_industries, nrow(parms)))
   ICC_all <- array(0,dim = c(periods, n_industries, nrow(parms)))
   cartels_detected <- array(0,dim = c(periods, n_industries, nrow(parms)))
   cartels_undetected <- array(0,dim = c(periods, n_industries, nrow(parms)))
@@ -254,6 +255,7 @@ sim_col_r <- function(model=1, periods=1000, n_industries=30,
     allcartels_pop <- matrix(0, nrow =periods, ncol = n_industries)
     delta_inds <- matrix(0, nrow =periods, ncol = n_industries)
     r_inds <- matrix(0, nrow =periods, ncol = n_industries)
+    sigma_inds <- matrix(0, nrow =periods, ncol = n_industries)
     ICC_inds <- matrix(0, nrow =periods, ncol = n_industries)
 
     for (i in 1:n_industries) {
@@ -271,14 +273,16 @@ sim_col_r <- function(model=1, periods=1000, n_industries=30,
       allcartels_pop[, i] <- cartels_pop
       delta_inds[, i] <- sim_list$deltas
       r_inds[, i] <- sim_list$walk_r
+      sigma_inds[, i] <- sim_list$sigma_cartels
       ICC_inds[, i] <- sim_list$ICC_entry
     }
     delta_all[,, k] <- delta_inds
     r_all[,, k] <- r_inds
+    sigma_all[,, k] <- sigma_inds
     ICC_all[,, k] <- ICC_inds
     cartels_detected[,, k] <- allcartels_det
     cartels_undetected[,, k] <- allcartels_undet
     cartels_population[,, k] <- allcartels_pop
   }
-  return(list(cartels_detected = cartels_detected, cartels_undetected = cartels_undetected, cartels_population = cartels_population, deltas = delta_all, interest_r = r_all, parms=parms, ICC=ICC_all))
+  return(list(cartels_detected = cartels_detected, cartels_undetected = cartels_undetected, cartels_population = cartels_population, deltas = delta_all, interest_r = r_all, parms=parms, ICC=ICC_all, sigmas = sigma_all))
 }
