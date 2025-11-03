@@ -37,7 +37,7 @@ set.seed(123)
 
 ### Read in Data
 ```{r}
-# Baseline Model 1 with default parameters.
+# Baseline Model 1 with default parameters
 sim_list <- sim_col_r()
 
 # Model I in Bellert, Günster (2025)
